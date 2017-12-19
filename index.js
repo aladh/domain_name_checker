@@ -2,9 +2,11 @@ const https = require('https');
 const AWS = require('aws-sdk');
 const ses = new AWS.SES();
 
-const BASE_URL = 'https://www.cineplex.com/Movie/';
+const API_KEY = '';
+const BASE_URL = `https://api.jsonwhois.io/whois/domain?key=${API_KEY}&domain=`;
 const EMAIL_ADDRESS = '';
-const MOVIES = [];
+const NOTIFY_THRESHOLD = 7776000000;
+const DOMAINS = [];
 
 function fetch(url) {
   return new Promise((resolve, reject) => {
@@ -40,16 +42,17 @@ function sendEmail({ to, subject, body }) {
     });
 }
 
-function checkSaleStatus(movie) {
+function getExpiryDate(domain) {
   return new Promise((resolve, reject) => {
-    console.log('Checking ' + movie);
+    console.log('Checking ' + domain);
 
-    fetch(BASE_URL + movie)
-      .then((html) => {
-        let onSale = html.includes('quick-tickets');
-        console.log(movie + ' ' + onSale);
+    fetch(BASE_URL + domain)
+      .then((responseString) => {
+        let {result: {expires}} = JSON.parse(responseString);
 
-        resolve(onSale)
+        console.log(domain + ' ' + expires);
+
+        resolve(new Date(expires))
       })
       .catch(err => {
         console.log(err);
@@ -58,24 +61,28 @@ function checkSaleStatus(movie) {
   })
 }
 
-function emailIfOnSale(movies) {
+function shouldNotify(date) {
+  return date - new Date() < NOTIFY_THRESHOLD
+}
+
+function notifyIfNeeded(domains) {
   return new Promise((_, reject) => {
-    movies.forEach((movie) => {
-      checkSaleStatus(movie)
-        .then(onSale => {
-          if (onSale) {
+    domains.forEach((domain) => {
+      getExpiryDate(domain)
+        .then(date => {
+          if (shouldNotify(date)) {
             sendEmail({
               to: EMAIL_ADDRESS,
-              subject: `Cineplex tickets on sale for ${movie}`,
-              body: `${BASE_URL}${movie}`
+              subject: `Domain name ${domain} expiring on ${date}`,
+              body: `${domain}`
             })
           }
         })
         .catch((err) => {
           sendEmail({
             to: EMAIL_ADDRESS,
-            subject: `Cineplex checker failed for ${movie}`,
-            body: `${err} ${BASE_URL}${movie}`
+            subject: `Domain name check failed for ${domain}`,
+            body: `${err} ${domain}`
           });
 
           reject(err)
@@ -85,6 +92,6 @@ function emailIfOnSale(movies) {
 }
 
 exports.handler = (event, context, callback) => {
-  emailIfOnSale(MOVIES)
+  notifyIfNeeded(DOMAINS)
     .catch(callback)
 };
