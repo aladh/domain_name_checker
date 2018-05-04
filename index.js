@@ -1,97 +1,79 @@
-const https = require('https');
+const { get } = require('https');
+// noinspection NpmUsedModulesInstalled
 const AWS = require('aws-sdk');
+// noinspection JSUnresolvedFunction
 const ses = new AWS.SES();
 
 const API_KEY = '';
 const BASE_URL = `https://api.jsonwhois.io/whois/domain?key=${API_KEY}&domain=`;
 const EMAIL_ADDRESS = '';
-const NOTIFY_THRESHOLD = 7776000000;
+const NOTIFY_THRESHOLD = 7776000000; // 3 months
 const DOMAINS = [];
 
 function fetch(url) {
   return new Promise((resolve, reject) => {
-    https
-      .get(url, resp => {
-        const { statusCode } = resp;
-        if (statusCode !== 200) reject(`Status code: ${statusCode}`);
+    get(url, (res) => {
+      const { statusCode } = res;
 
-        let data = '';
-        resp.on('data', chunk => data += chunk);
-        resp.on('end', () => resolve(data));
-      })
+      if (statusCode !== 200) {
+        reject(`Bad status code: ${statusCode}`);
+        res.destroy();
+        return
+      }
+
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => resolve(data))
+    })
       .on('error', reject)
   })
 }
 
 function sendEmail({ to, subject, body }) {
+  // noinspection JSUnresolvedFunction, JSUnusedLocalSymbols
   ses.sendEmail({
-      Source: to,
-      Destination: { ToAddresses: [to] },
-      Message: {
-        Subject: {
-          Data: subject
-        },
-        Body: {
-          Text: {
-            Data: body
-          }
+    Source: to,
+    Destination: { ToAddresses: [to] },
+    Message: {
+      Subject: {
+        Data: subject
+      },
+      Body: {
+        Text: {
+          Data: body
         }
       }
-    }, (err, _data) => {
-      if (err) throw err;
-    });
-}
-
-function getExpiryDate(domain) {
-  return new Promise((resolve, reject) => {
-    console.log('Checking ' + domain);
-
-    fetch(BASE_URL + domain)
-      .then((responseString) => {
-        let {result: {expires}} = JSON.parse(responseString);
-
-        console.log(domain + ' ' + expires);
-
-        resolve(new Date(expires))
-      })
-      .catch(err => {
-        console.log(err);
-        reject(err)
-      })
+    }
+  }, (err, _data) => {
+    if (err) throw err
   })
 }
 
-function shouldNotify(date) {
-  return date - new Date() < NOTIFY_THRESHOLD
+async function expiryDate(domain) {
+  const { result: { expires } } = JSON.parse(await fetch(BASE_URL + domain));
+  return Date.parse(expires)
 }
 
-function notifyIfNeeded(domains) {
-  return new Promise((_, reject) => {
-    domains.forEach((domain) => {
-      getExpiryDate(domain)
-        .then(date => {
-          if (shouldNotify(date)) {
-            sendEmail({
-              to: EMAIL_ADDRESS,
-              subject: `Domain name ${domain} expiring on ${date}`,
-              body: `${domain}`
-            })
-          }
-        })
-        .catch((err) => {
-          sendEmail({
-            to: EMAIL_ADDRESS,
-            subject: `Domain name check failed for ${domain}`,
-            body: `${err} ${domain}`
-          });
+function expiringSoon(date) {
+  return date - Date.now() < NOTIFY_THRESHOLD
+}
 
-          reject(err)
-        })
-    })
+exports.handler = () => {
+  DOMAINS.forEach(async (domain) => {
+    try {
+      const date = await expiryDate(domain);
+
+      expiringSoon(date) && sendEmail({
+        to: EMAIL_ADDRESS,
+        subject: `Domain name ${domain} expiring on ${new Date(date)}`,
+        body: `${domain}`
+      })
+    } catch (e) {
+      sendEmail({
+        to: EMAIL_ADDRESS,
+        subject: `Domain name check failed for ${domain}`,
+        body: `${e} ${domain}`
+      })
+    }
   })
-}
-
-exports.handler = (event, context, callback) => {
-  notifyIfNeeded(DOMAINS)
-    .catch(callback)
 };
