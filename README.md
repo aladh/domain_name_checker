@@ -6,4 +6,5 @@ Deployed as a Cron triggered AWS Lambda
 
 - Set environment variable API_KEY with key for [JsonWhois](https://jsonwhois.io/) API
 - Set environment variable EMAIL_ADDRESS with email to notify
-- Fill in DOMAINS constant in index.js with a list of domain names (ex. abc.com) to check
+- Fill in DOMAINS constant in index.js with a list of domain names to check
+    - Example "abc.com"
