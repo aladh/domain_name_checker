@@ -7,7 +7,7 @@ const ses = new AWS.SES();
 const API_KEY = '';
 const BASE_URL = `https://api.jsonwhois.io/whois/domain?key=${API_KEY}&domain=`;
 const EMAIL_ADDRESS = '';
-const NOTIFY_THRESHOLD = 7776000000; // 3 months
+const NOTIFY_THRESHOLD = 2592000000; // 30 days
 const DOMAINS = [];
 
 function fetch(url) {
