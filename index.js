@@ -1,8 +1,8 @@
 const { get } = require('https');
 // noinspection NpmUsedModulesInstalled
-const AWS = require('aws-sdk');
+const SES = require('aws-sdk/clients/ses');
 // noinspection JSUnresolvedFunction
-const ses = new AWS.SES();
+const ses = new SES();
 
 const BASE_URL = `https://api.jsonwhois.io/whois/domain?key=${process.env.API_KEY}&domain=`;
 const NOTIFY_THRESHOLD = 2592000000; // 30 days
