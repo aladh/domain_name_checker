@@ -4,9 +4,7 @@ const AWS = require('aws-sdk');
 // noinspection JSUnresolvedFunction
 const ses = new AWS.SES();
 
-const API_KEY = '';
-const BASE_URL = `https://api.jsonwhois.io/whois/domain?key=${API_KEY}&domain=`;
-const EMAIL_ADDRESS = '';
+const BASE_URL = `https://api.jsonwhois.io/whois/domain?key=${process.env.API_KEY}&domain=`;
 const NOTIFY_THRESHOLD = 2592000000; // 30 days
 const DOMAINS = [];
 
@@ -64,13 +62,13 @@ exports.handler = () => {
       const date = await expiryDate(domain);
 
       expiringSoon(date) && sendEmail({
-        to: EMAIL_ADDRESS,
+        to: process.env.EMAIL_ADDRESS,
         subject: `Domain name ${domain} expiring on ${new Date(date)}`,
         body: `${domain}`
       })
     } catch (e) {
       sendEmail({
-        to: EMAIL_ADDRESS,
+        to: process.env.EMAIL_ADDRESS,
         subject: `Domain name check failed for ${domain}`,
         body: `${e} ${domain}`
       })
