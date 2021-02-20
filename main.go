@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/ali-l/domain_name_checker/whoisapi"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ali-l/domain_name_checker/whoisapi"
 )
 
 const notifyThreshold = 720 // 30 days

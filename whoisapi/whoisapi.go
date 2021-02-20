@@ -3,11 +3,12 @@ package whoisapi
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ali-l/domain_name_checker/config"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ali-l/domain_name_checker/config"
 )
 
 const layoutISO = "2006-01-02"
