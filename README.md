@@ -7,7 +7,7 @@ Notifies you when a domain is available or expiring soon.
 - Set environment variable WHOIS_API_KEY with key for [JsonWhois](https://jsonwhois.io/) API
 - Deployed as a scheduled job on GitLab CI.
 
-####Build
+#### Build
 
 ```shell
 go build
