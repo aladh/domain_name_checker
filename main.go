@@ -52,10 +52,19 @@ func main() {
 func isAvailable(domain string) (bool, error) {
 	log.Printf("Checking %s\n", domain)
 
-	t, err := whoisapi.GetExpiry(domain)
+	whois, err := whoisapi.GetWhoisInfo(domain)
 	if err != nil {
-		return false, fmt.Errorf("error getting expiry date for domain %s: %w", domain, err)
+		return false, fmt.Errorf("error getting whois info for domain %s: %w", domain, err)
 	}
 
-	return time.Until(t) <= notifyThreshold*time.Hour, nil
+	if whois.Registered == false {
+		return true, nil
+	}
+
+	expirationDate, err := whois.ExpirationDate()
+	if err != nil {
+		return false, fmt.Errorf("error getting expiration date for domain %s: %w", domain, err)
+	}
+
+	return time.Until(expirationDate) <= notifyThreshold*time.Hour, nil
 }
