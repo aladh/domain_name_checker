@@ -1,10 +1,20 @@
 # Domain Name Checker
-Sends you an email when a domain name is going to expire within the next month
+
+Notifies you when a domain is available or expiring soon.
 
 ### Configuration
-Deployed as a Cron triggered AWS Lambda
 
-- Set environment variable API_KEY with key for [JsonWhois](https://jsonwhois.io/) API
-- Set environment variable EMAIL_ADDRESS with email to notify
-- Fill in DOMAINS constant in index.js with a list of domain names to check
-    - Example "abc.com"
+- Set environment variable WHOIS_API_KEY with key for [JsonWhois](https://jsonwhois.io/) API
+- Deployed as a scheduled job on GitLab CI.
+
+####Build
+
+```shell
+go build
+```
+
+#### Run
+
+```shell
+WHOIS_API_KEY=KEY ./domain_name_checker example.com 
+```
