@@ -58,7 +58,7 @@ func isAvailable(domain string) (bool, error) {
 		return false, fmt.Errorf("error getting whois info for domain %s: %w", domain, err)
 	}
 
-	if whois.Registered == false {
+	if !whois.Registered {
 		return true, nil
 	}
 
