@@ -3,7 +3,7 @@ package whoisapi
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -39,7 +39,7 @@ func GetWhoisInfo(domain string) (WhoisResult, error) {
 		return WhoisResult{}, fmt.Errorf("error getting response: %w", err)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return WhoisResult{}, fmt.Errorf("error reading response body: %w", err)
 	}
