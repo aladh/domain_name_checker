@@ -13,14 +13,14 @@ lint:
 
 binary:
   stage: build
-  image: golang:1.15-buster
+  image: golang:1.16-buster
   script: go build
   except:
     - schedules
 
 check-availability:
   stage: run
-  image: golang:1.15-buster
+  image: golang:1.16-buster
   variables:
     WHOIS_API_KEY: $WHOIS_API_KEY
   before_script:
