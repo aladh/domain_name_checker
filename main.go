@@ -1,71 +1,94 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"log"
-	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/ali-l/domain_name_checker/whoisapi"
 )
 
-const notifyThreshold = 720 // 30 days
-
-var domains []string
-
 func init() {
-	domains = strings.Split(os.Args[1], ",")
+	flag.Parse()
 }
 
 func main() {
-	availableChan := make(chan string, len(domains))
+	domains := strings.Split(flag.Arg(0), ",")
+
+	domainsChan := make(chan string)
+	go func() {
+		for _, domain := range domains {
+			domainsChan <- domain
+		}
+
+		close(domainsChan)
+	}()
+
+	tldRegex := regexp.MustCompile("^.*\\.(.*)$")
+	tldChanChan := make(chan chan string)
+	go partitionBy(domainsChan, tldChanChan, func(domain string) string {
+		matches := tldRegex.FindStringSubmatch(domain)
+		return matches[1]
+	})
+
+	availableChan := checkAvailability(tldChanChan)
+
+	for domain := range availableChan {
+		log.Println(domain)
+	}
+}
+
+func checkAvailability(tldChanChan chan chan string) chan string {
+	availableChan := make(chan string, 1)
+
+	go checkAvailabilityAsync(tldChanChan, availableChan)
+
+	return availableChan
+}
+
+func checkAvailabilityAsync(tldChanChan chan chan string, availableChan chan string) {
 	wg := sync.WaitGroup{}
 
-	for _, domain := range domains {
+	for tldChan := range tldChanChan {
 		wg.Add(1)
 
-		go func(domain string, availableChan chan<- string) {
+		go func(tldChan chan string) {
 			defer wg.Done()
 
-			available, err := isAvailable(domain)
-			if err != nil {
-				log.Printf("error checking availability: %s\n", err)
-				return
-			}
-
-			if available {
-				log.Printf("Domain name %s is available\n", domain)
-				availableChan <- domain
-			}
-		}(domain, availableChan)
+			checkAvailabilityForTld(tldChan, availableChan)
+		}(tldChan)
 	}
 
 	wg.Wait()
 	close(availableChan)
+}
 
-	if len(availableChan) > 0 {
-		log.Fatalln("One or more domains is available!")
+func checkAvailabilityForTld(tldChan chan string, availableChan chan string) {
+	for domain := range tldChan {
+		log.Printf("processing domain: %s\n", domain)
+		time.Sleep(1 * time.Second)
 	}
 }
 
-func isAvailable(domain string) (bool, error) {
-	log.Printf("Checking %s\n", domain)
+func partitionBy(itemsChan chan string, partChanChan chan chan string, partitionKey func(string) string) {
+	partChanMap := make(map[string]chan string)
 
-	whois, err := whoisapi.GetWhoisInfo(domain)
-	if err != nil {
-		return false, fmt.Errorf("error getting whois info for domain %s: %w", domain, err)
+	for item := range itemsChan {
+		partKey := partitionKey(item)
+
+		if partChan, ok := partChanMap[partKey]; ok {
+			partChan <- item
+		} else {
+			partChan = make(chan string, 100)
+			partChanMap[partKey] = partChan
+			partChanChan <- partChan
+			partChan <- item
+		}
 	}
 
-	if !whois.Registered {
-		return true, nil
+	for _, v := range partChanMap {
+		close(v)
 	}
-
-	expirationDate, err := whois.ExpirationDate()
-	if err != nil {
-		return false, fmt.Errorf("error getting expiration date for domain %s: %w", domain, err)
-	}
-
-	return time.Until(expirationDate) <= notifyThreshold*time.Hour, nil
+	close(partChanChan)
 }
