@@ -26,69 +26,85 @@ func main() {
 	}()
 
 	tldRegex := regexp.MustCompile("^.*\\.(.*)$")
-	tldChanChan := make(chan chan string)
-	go partitionBy(domainsChan, tldChanChan, func(domain string) string {
+	tldsChan := make(chan *tld)
+	go partitionBy(domainsChan, tldsChan, func(domain string) string {
 		matches := tldRegex.FindStringSubmatch(domain)
 		return matches[1]
 	})
 
-	availableChan := checkAvailability(tldChanChan)
+	availableChan := checkAvailability(tldsChan)
 
 	for domain := range availableChan {
 		log.Println(domain)
 	}
 }
 
-func checkAvailability(tldChanChan chan chan string) chan string {
+func checkAvailability(tldsChan chan *tld) chan string {
 	availableChan := make(chan string, 1)
 
-	go checkAvailabilityAsync(tldChanChan, availableChan)
+	go checkAvailabilityAsync(tldsChan, availableChan)
 
 	return availableChan
 }
 
-func checkAvailabilityAsync(tldChanChan chan chan string, availableChan chan string) {
+func checkAvailabilityAsync(tldsChan chan *tld, availableChan chan string) {
 	wg := sync.WaitGroup{}
 
-	for tldChan := range tldChanChan {
+	for t := range tldsChan {
 		wg.Add(1)
 
-		go func(tldChan chan string) {
+		go func(t1 *tld) {
 			defer wg.Done()
 
-			checkAvailabilityForTld(tldChan, availableChan)
-		}(tldChan)
+			checkAvailabilityForTld(t1, availableChan)
+		}(t)
 	}
 
 	wg.Wait()
 	close(availableChan)
 }
 
-func checkAvailabilityForTld(tldChan chan string, availableChan chan string) {
-	for domain := range tldChan {
+func checkAvailabilityForTld(t *tld, availableChan chan string) {
+	log.Printf("starting worker for tld: %s\n", t.Name)
+
+	for domain := range t.Domains {
 		log.Printf("processing domain: %s\n", domain)
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func partitionBy(itemsChan chan string, partChanChan chan chan string, partitionKey func(string) string) {
-	partChanMap := make(map[string]chan string)
+type tld struct {
+	Name    string
+	Domains chan string
+}
 
-	for item := range itemsChan {
-		partKey := partitionKey(item)
+func NewTld(name string) *tld {
+	const tldBuffer = 100
 
-		if partChan, ok := partChanMap[partKey]; ok {
-			partChan <- item
+	return &tld{
+		Name:    name,
+		Domains: make(chan string, tldBuffer),
+	}
+}
+
+func partitionBy(domainsChan chan string, tldsChan chan *tld, partitionKey func(string) string) {
+	tldMap := make(map[string]*tld)
+
+	for domain := range domainsChan {
+		tldName := partitionKey(domain)
+
+		if tldForDomain, ok := tldMap[tldName]; ok {
+			tldForDomain.Domains <- domain
 		} else {
-			partChan = make(chan string, 100)
-			partChanMap[partKey] = partChan
-			partChanChan <- partChan
-			partChan <- item
+			tldForDomain = NewTld(tldName)
+			tldMap[tldName] = tldForDomain
+			tldsChan <- tldForDomain
+			tldForDomain.Domains <- domain
 		}
 	}
 
-	for _, v := range partChanMap {
-		close(v)
+	for _, v := range tldMap {
+		close(v.Domains)
 	}
-	close(partChanChan)
+	close(tldsChan)
 }
