@@ -16,24 +16,15 @@ func init() {
 func main() {
 	domains := strings.Split(flag.Arg(0), ",")
 
-	domainsChan := make(chan string)
-	go func() {
-		for _, domain := range domains {
-			domainsChan <- domain
-		}
-
-		close(domainsChan)
-	}()
-
 	tldRegex := regexp.MustCompile("^.*\\.(.*)$")
 	tldsChan := make(chan *tld)
-	go partitionBy(domainsChan, tldsChan, func(domain string) string {
+
+	go partitionBy(domains, tldsChan, func(domain string) string {
 		matches := tldRegex.FindStringSubmatch(domain)
 		return matches[1]
 	})
 
 	availableChan := checkAvailability(tldsChan)
-
 	for domain := range availableChan {
 		log.Println(domain)
 	}
@@ -53,10 +44,10 @@ func checkAvailabilityAsync(tldsChan chan *tld, availableChan chan string) {
 	for t := range tldsChan {
 		wg.Add(1)
 
-		go func(t1 *tld) {
+		go func(t *tld) {
 			defer wg.Done()
 
-			checkAvailabilityForTld(t1, availableChan)
+			checkAvailabilityForTld(t, availableChan)
 		}(t)
 	}
 
@@ -87,10 +78,10 @@ func NewTld(name string) *tld {
 	}
 }
 
-func partitionBy(domainsChan chan string, tldsChan chan *tld, partitionKey func(string) string) {
+func partitionBy(domainsChan []string, tldsChan chan *tld, partitionKey func(string) string) {
 	tldMap := make(map[string]*tld)
 
-	for domain := range domainsChan {
+	for _, domain := range domainsChan {
 		tldName := partitionKey(domain)
 
 		if tldForDomain, ok := tldMap[tldName]; ok {
