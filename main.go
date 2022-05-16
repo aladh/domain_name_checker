@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/aladh/domain_name_checker/rdap"
 )
 
 func init() {
@@ -15,6 +17,11 @@ func init() {
 
 func main() {
 	domains := strings.Split(flag.Arg(0), ",")
+
+	err := rdap.Initialize()
+	if err != nil {
+		log.Fatalf("error initialzing rdap: %s", err)
+	}
 
 	tldRegex := regexp.MustCompile("^.*\\.(.*)$")
 	tldsChan := make(chan *tld)
@@ -60,7 +67,14 @@ func checkAvailabilityForTld(t *tld, availableChan chan string) {
 
 	for domain := range t.Domains {
 		log.Printf("processing domain: %s\n", domain)
-		time.Sleep(1 * time.Second)
+		expiryDate, err := rdap.ExpiryDate(domain)
+		if err != nil {
+			log.Printf("error checking expiry date for domain %s: %s\n", domain, err)
+			continue
+		}
+
+		log.Printf("domain %s expires on %s\n", domain, expiryDate)
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 
