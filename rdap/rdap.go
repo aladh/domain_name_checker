@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
+
+	"github.com/aladh/domain_name_checker/domain"
 )
 
 type rdapResponse struct {
@@ -28,18 +29,15 @@ func Initialize() error {
 	return nil
 }
 
-func ExpiryDate(domain string) (string, error) {
-	tldRegex := regexp.MustCompile("^.*\\.(.*)$")
-	matches := tldRegex.FindStringSubmatch(domain)
-
-	serviceURL, err := serviceForTld(matches[1])
+func ExpiryDate(domain *domain.Domain) (string, error) {
+	serviceURL, err := serviceForTld(domain.Tld)
 	if err != nil {
-		return "", fmt.Errorf("error getting service for domain %s", domain)
+		return "", fmt.Errorf("error getting service for domain %s", domain.Name)
 	}
 
-	resp, err := http.Get(fmt.Sprintf("%sdomain/%s", serviceURL, domain))
+	resp, err := http.Get(fmt.Sprintf("%sdomain/%s", serviceURL, domain.Name))
 	if err != nil {
-		return "", fmt.Errorf("error making request for domain %s", domain)
+		return "", fmt.Errorf("error making request for domain %s", domain.Name)
 	}
 
 	if resp.StatusCode != 200 {
